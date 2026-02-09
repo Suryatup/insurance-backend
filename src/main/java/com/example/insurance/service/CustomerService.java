@@ -5,18 +5,20 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
+import com.example.insurance.model.UserEntity;
+import com.example.insurance.repository.CustomerDetRepository;
+import com.google.cloud.firestore.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.insurance.FirebaseConfig;
 import com.example.insurance.model.Customer;
 import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.CollectionReference;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
 
 import lombok.RequiredArgsConstructor;
+
 
 @Service
 @RequiredArgsConstructor
@@ -24,27 +26,20 @@ public class CustomerService {
 
     private final FirebaseConfig firebase;
 
-    private CollectionReference collection() {
-        return firebase.getDb().collection("customers");
+    @Autowired
+    private CustomerDetRepository customerDetRepository;
+
+    private CollectionReference collection(String tableName) {
+        return firebase.getDb().collection(tableName);
     }
 
     public List<Customer> getAll() throws Exception {
-        List<Customer> list = new ArrayList<>();
-        ApiFuture<QuerySnapshot> future = collection().get();
-
-        for (DocumentSnapshot d : future.get().getDocuments()) {
-            Customer c = d.toObject(Customer.class);
-            if (c != null) {
-                c.setId(d.getId());
-                list.add(c);
-            }
-        }
-        return list;
+        return  customerDetRepository.findAll();
     }
 
     public Customer getById(String id) throws Exception {
         DocumentSnapshot doc =
-                collection().document(id).get().get();
+                collection("customers").document(id).get().get();
 
         if (!doc.exists())
             return null;
@@ -59,15 +54,16 @@ public class CustomerService {
     // ✅ NEW customer → mail not sent yet
     public Customer create(Customer customer) throws Exception {
 
-        DocumentReference ref = collection().document();
-
-        customer.setId(ref.getId());
+//        DocumentReference ref = collection("customers").document();
+//
+//        customer.setId(ref.getId());
         customer.setRegistrationDate(now());
         customer.setLastUpdated(now());
 
         customer.setExpiryMailSent(false);
 
-        ref.set(customer).get();
+       // ref.set(customer).get();
+        customerDetRepository.save(customer);
         return customer;
     }
 
@@ -109,15 +105,17 @@ public class CustomerService {
                     existing.getExpiryMailSent());
         }
 
-        collection().document(id).set(customer).get();
+        collection("customers").document(id).set(customer).get();
         return customer;
     }
 
     public void delete(String id) {
-        collection().document(id).delete();
+        collection("customers").document(id).delete();
     }
 
     private String now() {
         return new Date().toString();
     }
+
+
 }
